@@ -10,7 +10,7 @@ checkpoint_path: &checkpoint_path ./weights/24_normative_eval/autoddpm/
 experiment:
   name: 24_Normative_Eval
   task: train
-  weights: ''
+  weights:
 #  weights: ./weights/anodppm/Pretrainer_3000ep_128x/best_model.pt
 #  weights: './weights/23_uad_review/anoddpm/2023_09_01_15_18_07_633082/best_model.pt' # Gaussian
 

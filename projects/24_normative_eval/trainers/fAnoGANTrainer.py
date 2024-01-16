@@ -1,20 +1,19 @@
 from core.Trainer import Trainer
 from time import time
-import os
 import wandb
 import logging
-from net_utils.simplex_noise import generate_noise, generate_simplex_noise
 from optim.losses.image_losses import *
-from torch.cuda.amp import GradScaler, autocast
+import matplotlib.pyplot as plt
+import copy
 
-"""
-Implementation of the abstract class "Trainer" from core module.
-Includes training and validation routines
-"""
+
 class PTrainer(Trainer):
     def __init__(self, training_params, model, data, device, log_wandb=True):
         super(PTrainer, self).__init__(training_params, model, data, device, log_wandb)
-        self.val_interval = training_params['val_interval']
+        lr = training_params['optimizer_params']['lr']
+        self.optimizer_E = torch.optim.Adam(self.model.encoder.parameters(),
+                                            lr=lr, betas=(0.5, 0.999))
+        self.kappa = 1.0
 
     def train(self, model_state=None, opt_state=None, start_epoch=0):
         """
@@ -32,12 +31,9 @@ class PTrainer(Trainer):
             self.model.load_state_dict(model_state)  # load weights
         if opt_state is not None:
             self.optimizer.load_state_dict(opt_state)  # load optimizer
-
         epoch_losses = []
-
+        epoch_losses_pl = []
         self.early_stop = False
-        # to handle loss with mixed precision training
-        scaler = GradScaler()
 
         for epoch in range(self.training_params['nr_epochs']):
             if start_epoch > epoch:
@@ -46,53 +42,77 @@ class PTrainer(Trainer):
                 logging.info("[Trainer::test]: ################ Finished training (early stopping) ################")
                 break
             start_time = time()
-            batch_loss, count_images = 1.0, 0
+            batch_loss, batch_loss_pl, count_images = 1.0, 1.0, 0
 
             for data in self.train_ds:
                 # Input
                 images = data[0].to(self.device)
-                count_images += images.shape[0]
                 transformed_images = self.transform(images) if self.transform is not None else images
-                
-                self.optimizer.zero_grad()
-                
-                # for mixed precision training
-                with autocast(enabled=True):
-                    # Create timesteps
-                    timesteps = torch.randint(
-                        0, self.model.train_scheduler.num_train_timesteps, (transformed_images.shape[0],), device=images.device
-                    ).long()
+                b, c, w, h = images.shape
+                count_images += b
 
-                    # Generate random noise and noisy images
-                    noise = generate_noise(self.model.train_scheduler.noise_type, images, self.model.train_scheduler.num_train_timesteps)
-                    
-                    # Get model prediction
-                    pred = self.model(inputs=transformed_images, noise=noise, timesteps=timesteps)
+                # Forward Pass
+                self.optimizer_E.zero_grad()
 
-                    target = transformed_images if self.model.prediction_type == 'sample' else noise
-                    loss = self.criterion_rec(pred.float(), target.float())
+                # Generate a batch of latent variables
+                z = self.model.encoder(transformed_images)
 
-                scaler.scale(loss).backward()
-                scaler.step(self.optimizer)
-                scaler.update()
+                # Generate a batch of images
+                fake_imgs = self.model.wgan.generator(z)
+
+                # Real features
+                real_features = self.model.wgan.discriminator.forward_features(transformed_images)
+                # Fake features
+                fake_features = self.model.wgan.discriminator.forward_features(fake_imgs)
+
+                # izif architecture
+                loss_imgs = self.criterion_rec(fake_imgs, transformed_images, dict())
+                loss_features = self.criterion_rec(fake_features, real_features)
+                loss = loss_imgs + self.kappa * loss_features
+
+                loss.backward()
+                self.optimizer_E.step()
+
+                loss_pl = self.criterion_PL(fake_imgs, transformed_images)
+                reconstructed_images = fake_imgs
 
                 batch_loss += loss.item() * images.size(0)
+                batch_loss_pl += loss_pl.item() * images.size(0)
 
             epoch_loss = batch_loss / count_images if count_images > 0 else batch_loss
+            epoch_loss_pl = batch_loss_pl / count_images if count_images > 0 else batch_loss_pl
             epoch_losses.append(epoch_loss)
+            epoch_losses_pl.append(epoch_loss_pl)
 
             end_time = time()
             print('Epoch: {} \tTraining Loss: {:.6f} , computed in {} seconds for {} samples'.format(
                 epoch, epoch_loss, end_time - start_time, count_images))
             wandb.log({"Train/Loss_": epoch_loss, '_step_': epoch})
+            wandb.log({"Train/Loss_PL_": epoch_loss_pl, '_step_': epoch})
 
             # Save latest model
             torch.save({'model_weights': self.model.state_dict(), 'optimizer_weights': self.optimizer.state_dict()
-                           , 'epoch': epoch}, os.path.join(self.client_path, 'latest_model.pt'))
+                           , 'epoch': epoch}, self.client_path + '/latest_model.pt')
+
+            img = transformed_images[0].cpu().detach().numpy()
+            # print(np.min(img), np.max(img))
+            rec = reconstructed_images[0].cpu().detach().numpy()
+            # print(f'rec: {np.min(rec)}, {np.max(rec)}')
+            elements = [img, rec, np.abs(rec - img)]
+            v_maxs = [1, 1, 0.5]
+            diffp, axarr = plt.subplots(1, len(elements), gridspec_kw={'wspace': 0, 'hspace': 0})
+            diffp.set_size_inches(len(elements) * 4, 4)
+            for i in range(len(axarr)):
+                axarr[i].axis('off')
+                v_max = v_maxs[i]
+                c_map = 'gray' if v_max == 1 else 'plasma'
+                axarr[i].imshow(elements[i].transpose(1, 2, 0), vmin=0, vmax=v_max, cmap=c_map)
+
+            wandb.log({'Train/Example_': [
+                wandb.Image(diffp, caption="Iteration_" + str(epoch))]})
 
             # Run validation
-            if (epoch + 1) % self.val_interval == 0 and epoch > 0:
-                self.test(self.model.state_dict(), self.val_ds, 'Val', self.optimizer.state_dict(), epoch)
+            self.test(self.model.state_dict(), self.val_ds, 'Val', self.optimizer.state_dict(), epoch)
 
         return self.best_weights, self.best_opt_weights
 
@@ -116,7 +136,6 @@ class PTrainer(Trainer):
             task + '_loss_pl': 0,
         }
         test_total = 0
-
         with torch.no_grad():
             for data in test_data:
                 x = data[0]
@@ -124,8 +143,9 @@ class PTrainer(Trainer):
                 test_total += b
                 x = x.to(self.device)
 
-                x_, _ = self.test_model.sample_from_image(x, noise_level=self.model.noise_level_recon)
-                loss_rec = self.criterion_rec(x_, x)
+                # Forward pass
+                x_, x_rec = self.test_model(x)
+                loss_rec = self.criterion_rec(x_, x, x_rec)
                 loss_mse = self.criterion_MSE(x_, x)
                 loss_pl = self.criterion_PL(x_, x)
 
@@ -133,14 +153,21 @@ class PTrainer(Trainer):
                 metrics[task + '_loss_mse'] += loss_mse.item() * x.size(0)
                 metrics[task + '_loss_pl'] += loss_pl.item() * x.size(0)
 
-        rec = x_.detach().cpu()[0].numpy()
-        rec[0, 0], rec[0, 1] = 0, 1
         img = x.detach().cpu()[0].numpy()
-        img[0, 0], img[0, 1] = 0, 1
-        grid_image = np.hstack([img, rec])
+        rec = x_.detach().cpu()[0].numpy()
+
+        elements = [img, rec, np.abs(rec - img)]
+        v_maxs = [1, 1, 0.5]
+        diffp, axarr = plt.subplots(1, len(elements), gridspec_kw={'wspace': 0, 'hspace': 0})
+        diffp.set_size_inches(len(elements) * 4, 4)
+        for i in range(len(axarr)):
+            axarr[i].axis('off')
+            v_max = v_maxs[i]
+            c_map = 'gray' if v_max == 1 else 'plasma'
+            axarr[i].imshow(elements[i].transpose(1, 2, 0), vmin=0, vmax=v_max, cmap=c_map)
 
         wandb.log({task + '/Example_': [
-                wandb.Image(grid_image, caption="Iteration_" + str(epoch))]})
+            wandb.Image(diffp, caption="Iteration_" + str(epoch))]})
 
         for metric_key in metrics.keys():
             metric_name = task + '/' + str(metric_key)
@@ -152,9 +179,9 @@ class PTrainer(Trainer):
             if epoch_val_loss < self.min_val_loss:
                 self.min_val_loss = epoch_val_loss
                 torch.save({'model_weights': model_weights, 'optimizer_weights': opt_weights, 'epoch': epoch},
-                           os.path.join(self.client_path, 'best_model.pt'))
-                self.best_weights = model_weights
-                self.best_opt_weights = opt_weights
+                           self.client_path + '/best_model.pt')
+                self.best_weights = copy.deepcopy(model_weights)
+                self.best_opt_weights = copy.deepcopy(opt_weights)
             self.early_stop = self.early_stopping(epoch_val_loss)
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step(epoch_val_loss)
