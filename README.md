@@ -1,5 +1,3 @@
-# gen_ai_uad
-Evaluation of normative learning or generative AI methods for Unsupervised Anomaly Detection 
 <p align="center">
 <img src="https://github.com/ci-ber/GenAI_UAD/assets/106509806/a1b6785e-0844-422b-911e-69da4e7aced1" width=200>
 </p>
