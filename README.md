@@ -21,8 +21,9 @@ Evaluating Normative Learning in Generative AI for Robust Medical Anomaly Detect
 <h4 align="center"> <a href="https://openreview.net/pdf?id=kTpafpXrqa](https://www.researchsquare.com/article/rs-3749187/v1)">Paper</a> </h4>
 
 <p align="center">
-<img src="https://github.com/ci-ber/autoDDPM/assets/106509806/54bebddf-d074-4eb9-82f3-3115f8625fc7">
+<img src="https://github.com/ci-ber/GenAI_UAD/assets/106509806/5303973d-6bde-4d20-bd44-c4ff84deb9cd">
 </p>
+
 
 ## Citation
 
