@@ -60,15 +60,15 @@ Paste the API key from https://wandb.ai/authorize when prompted.
 #### 2). Clone repository
 
 ```bash
-git clone https://github.com/ci-ber/autoDDPM.git
-cd autoDDPM
+git clone https://github.com/ci-ber/GenAI_UAD.git
+cd GenAI_UAD
 ```
 
 #### 3). Install requirements
 *Optional* create virtual env:
 ```bash
-conda create --name autoddpm python=3.8.0
-conda activate autoddpm
+conda create --name genai python=3.8.0
+conda activate genai
 ```
 
 ```bash
@@ -93,22 +93,15 @@ pip3 install torch==1.9.1 torchvision==0.10.1 -f https://download.pytorch.org/wh
 
 > Move the datasets to the target locations. You can find detailed information about the expected files and locations in the corresponding *.csv files under data/$DATASET/splits.
 
-> *Alternatively you can use your own mid-axial slices of T1w brain scans with our <a href="https://www.dropbox.com/s/ooq7vdp9fp4ufag/latest_model.pt.zip?dl=0"> pre-trained weights</a> or train from scratch on other anatomies and modalities.*
+> *Alternatively train from scratch on other anatomies and modalities.*
 
-#### 6). !!! Set the right threshold
-
-You have to choose a threshold for binarizing the probable anomaly masks of the first step. Be mindful of this step since it can dramatically influence the outcome. In the paper, we use a threshold that delivers at most 5% false positive for inference *masking_threshold_infer: 0.13* in the *autoddpm.yaml* config file (for the given dataset). This has to be set for each dataset individually since the network might produce different errors on healthy data due to domain shifts! You can use the *thresholding* function in the *DownStreamEvaluator.py* to compute these on a healthy subsample of that distribution or use *-1* otherwise (This will automatically filter the 95% percentile of each scan individually). 
-
-#### 7). Run the pipeline
+#### 6). Run the pipeline
 
 Run the main script with the corresponding config like this:
 
 ```bash
-python core/Main.py --config_path ./projects/autoddpm/autoddpm.yaml
+python core/Main.py --config_path ./projects/24_normative_eval/autoddpm.yaml
 ```
-
-Refer to the autoddpm.yaml for the default configuration. Store the pre-trained model from <a href="https://www.dropbox.com/s/ooq7vdp9fp4ufag/latest_model.pt.zip?dl=0"> HERE</a> into the specified directory to skip the training part.
-
-By default, reconstructed images (from the first masking part of the pipeline) and inpainted images (after the second stitching and resampling part of the pipeline) are stored so that one can work on the parts of the pipeline in a modular way.
+Refer to the autoddpm.yaml (or *other_metho*.yaml) for the default configuration. 
 
 # That's it, enjoy! :rocket:
