@@ -1,18 +1,16 @@
-name: VQVAE
+name: Patched_AnoDDPM [Req. i.]
 target_size: &target_size !!python/tuple [128, 128]
 train_batch_size: &tbatch_size 16
 downstream_batch_size: &dbatch_size 1
-checkpoint_path: &checkpoint_path './weights/24_normative_eval/ltm/'
+checkpoint_path: &checkpoint_path './weights/24_normative_eval/patched_anoddpm/'
 #
-# Experiment Trained seperately | First vqvae has to be trained and wights put in the LTM_Trainer class | check
-#  original paper for details. Train ltm.yaml in the second step and evaluae using LTM_.yaml
-##  
+# Experiment
 #
 experiment:
   name: 24_Normative_Eval
   task: train
-#  weights: #''
-  weights: #'./weights/24_normative_eval/ltm/2023_11_06_14_34_01_814383/best_model.pt'
+  weights: #'./weights/24_normative_eval/patched_anoddpm/2023_09_18_15_35_15_304165/best_model.pt'
+
 
 device: gpu
 configurator:
@@ -23,28 +21,18 @@ configurator:
 # Model
 #
 model:
-  module_name: model_zoo.vqvae
-  class_name: VQVAE
+  module_name: model_zoo.patched_ddpm.DDPM_2D_patched
+  class_name: DDPM_2D
   params:
-    spatial_dims: 2
     in_channels: 1
-    out_channels: 1
-    num_res_layers: 2
-    downsample_parameters: [[2,4,1,1], [2,4,1,1]]
-    upsample_parameters: [[2,4,1,1,0], [2,4,1,1,0]]
-    num_channels:
-      - 256
-      - 256
-    num_res_channels:
-      - 256
-      - 256
-    num_embeddings: 16
-    embedding_dim: 64
+    timesteps: 1000
+    test_timesteps: 500
+    patch_size: 48
 #
 # Trainer
 #
 trainer:
-  module_name: projects.24_normative_eval.VQVAE_Trainer
+  module_name: projects.24_normative_eval.trainers.PatchedDiffTrainer
   class_name: PTrainer
   params:
     input_size: *target_size
@@ -55,7 +43,7 @@ trainer:
     # Loss
     loss:
       module_name: optim.losses.ln_losses
-      class_name: L1
+      class_name: L2
       params:
     optimizer_params:
       lr: 1.0e-4
@@ -69,8 +57,8 @@ trainer:
         target_size: *target_size
         batch_size: *tbatch_size
         dataset_module:
-          module_name: data.loaders.brain_loader
-          class_name: BrainLoader
+          module_name: data.loaders.ixi_loader
+          class_name: IXILoader
         data_dir:
           train:
             - './data/fastMRI/splits/ixi_normal_train.csv'

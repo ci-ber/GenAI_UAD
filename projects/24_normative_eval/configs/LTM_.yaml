@@ -68,14 +68,20 @@ trainer:
             - './data/fastMRI/splits/normal_val.csv'
           test:
             - './data/fastMRI/splits/normal_test.csv'
-
 # Downstream tasks
 downstream_tasks:
-  pseudo_healthy:
+######
+# EVALUATE ON HEALTHY AND SEARCH FOR THRESHOLD / OPERATING POINT
+######
+  healthy_baseline:
+    ### CHANGE task to 'thresholding' to search for a threshold for localization
+    ### CHANGE task to 'RQI' to compute the RQI values
+    ### CHANGE task to 'AHI_UNN' and normal_path to the path of normal training images to compute the AHI_UN;N values
     module_name: projects.24_normative_eval.DownstreamEvaluator
     class_name: PDownstreamEvaluator
     checkpoint_path: *checkpoint_path
-    global_detection: False
+    task: 'RQI'
+    normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
     data_loader:
       module_name: core.DataLoader
       class_name: DefaultDataLoader
@@ -91,6 +97,9 @@ downstream_tasks:
           data_dir:
             test:
               - './data/fastMRI/splits/normal_test.csv'
+######
+# ATLAS STROKE DETECTION
+#####
 #  detection:
 #    module_name: projects.24_normative_eval.DownstreamEvaluatorAtlas
 #    class_name: PDownstreamEvaluator
@@ -114,11 +123,19 @@ downstream_tasks:
 #          label_dir:
 #            test:
 #              - './data/ATLAS/splits/atlas_train_mask_png.csv'
+######
+# FAST MRI LOCALIZATION OF MULTIPLE DISEASES
+######
 #  localization:
+    ### Default: task: 'detection' performs anomaly localization on the fast MRI dataset
+    ### CHANGE task to 'AHI' to compute the AHI scores
+    ### CHANGE task to 'CACI' to compute CACI scores
+    ### SET normal_path: 'PATH_TO_NORMAL_TRAIN_IMAGES'
 #    module_name: projects.24_normative_eval.DownstreamEvaluator
 #    class_name: PDownstreamEvaluator
 #    checkpoint_path: *checkpoint_path
-#    global_detection: False
+#    task: 'detection'
+#    normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
 #    data_loader:
 #      module_name: core.DataLoader
 #      class_name: DefaultDataLoader
@@ -127,7 +144,7 @@ downstream_tasks:
 #          target_size: *target_size
 #          batch_size: *dbatch_size
 #          dataset_module:
-#            module_name: data.loaders.brain_loader
+#            module_name: data.loaders.fastmri_loader
 #            class_name: BrainLoader
 #      datasets:
 #        absent_septum:
