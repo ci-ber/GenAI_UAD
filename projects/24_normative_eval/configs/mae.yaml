@@ -34,7 +34,7 @@ model:
 # Trainer
 #
 trainer:
-  module_name: projects.24_normative_eval.MAE_Trainer
+  module_name: projects.24_normative_eval.trainers.MAE_Trainer
   class_name: PTrainer
   params:
     input_size: *target_size
