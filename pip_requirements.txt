@@ -23,5 +23,8 @@ xformers==0.0.22.post7
 plotly==5.8.0
 wandb==0.16.1
 timm=0.9.12
+einops==0.7.0
+ema_pytorch=0.3.2
+accelerate=0.26.1
 pytorch_fid
 torchio
