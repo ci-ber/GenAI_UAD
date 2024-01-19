@@ -57,8 +57,8 @@ trainer:
         target_size: *target_size
         batch_size: *tbatch_size
         dataset_module:
-          module_name: data.loaders.ixi_loader
-          class_name: IXILoader
+          module_name: data.loaders.brain_loader
+          class_name: BrainLoader
         data_dir:
           train:
             - './data/fastMRI/splits/ixi_normal_train.csv'
