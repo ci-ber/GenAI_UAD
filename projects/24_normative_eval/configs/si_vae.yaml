@@ -36,7 +36,7 @@ model:
 # Trainer
 #
 trainer:
-  module_name: projects.24_normative_eval.SIVAETrainer
+  module_name: projects.24_normative_eval.trainers.SIVAETrainer
   class_name: PTrainer
   params:
     input_size: *target_size
