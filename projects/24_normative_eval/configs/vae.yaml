@@ -32,7 +32,7 @@ model:
 # Trainer
 #
 trainer:
-  module_name: projects.24_normative_eval.Trainer
+  module_name: projects.24_normative_eval.trainers.Trainer
   class_name: PTrainer
   params:
     input_size: *target_size
