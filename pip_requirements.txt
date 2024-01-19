@@ -22,5 +22,6 @@ tqdm==4.62.3
 xformers==0.0.22.post7
 plotly==5.8.0
 wandb==0.16.1
+timm=0.9.12
 pytorch_fid
 torchio
