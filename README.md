@@ -62,18 +62,13 @@ git clone https://github.com/ci-ber/GenAI_UAD.git
 cd GenAI_UAD
 ```
 
-#### 3). Install requirements
+#### 3). Install PyTorch 
+
 *Optional* create virtual env:
 ```bash
 conda create --name genai python=3.8.0
 conda activate genai
 ```
-
-```bash
-pip install -r pip_requirements.txt
-```
-
-#### 4). Install PyTorch 
 
 > Example installation: 
 * *with cuda*: 
@@ -83,6 +78,12 @@ pip3 install torch==1.9.1+cu111 torchvision==0.10.1+cu111 -f https://download.py
 * *w/o cuda*:
 ```
 pip3 install torch==1.9.1 torchvision==0.10.1 -f https://download.pytorch.org/whl/torch_stable.html
+```
+
+#### 4). Install requirements
+
+```bash
+pip install -r pip_requirements.txt
 ```
 
 #### 5). Download datasets 

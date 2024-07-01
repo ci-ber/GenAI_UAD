@@ -74,6 +74,7 @@ downstream_tasks:
 ######
 # EVALUATE ON HEALTHY AND SEARCH FOR THRESHOLD / OPERATING POINT
 ######
+<<<<<<< HEAD
   # healthy_baseline:
   #   ### CHANGE task to 'thresholding' to search for a threshold for localization
   #   ### CHANGE task to 'RQI' to compute the RQI values
@@ -98,6 +99,33 @@ downstream_tasks:
   #         data_dir:
   #           test:
   #             - './data/fastMRI/splits/normal_test.csv'
+=======
+  healthy_baseline:
+    ### CHANGE task to 'thresholding' to search for a threshold for localization
+    ### CHANGE task to 'RQI' to compute the RQI values
+    ### CHANGE task to 'AHI_UNN' and normal_path to the path of normal training images to compute the AHI_UN;N values
+    module_name: projects.24_normative_eval.DownstreamEvaluator
+    class_name: PDownstreamEvaluator
+    checkpoint_path: *checkpoint_path
+    params:
+      task: 'RQI'
+      normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
+    data_loader:
+      module_name: core.DataLoader
+      class_name: DefaultDataLoader
+      params:
+        args:
+          target_size: *target_size
+          batch_size: *dbatch_size
+          dataset_module:
+            module_name: data.loaders.brain_loader
+            class_name: BrainLoader
+      datasets:
+        Normal_brain:
+          data_dir:
+            test:
+              - './data/fastMRI/splits/normal_test.csv'
+>>>>>>> a2e0d1a01e45c7ec710f093697958bf0ecb8d67b
 ######
 # ATLAS STROKE DETECTION
 #####
@@ -132,6 +160,7 @@ downstream_tasks:
     ### CHANGE task to 'AHI' to compute the AHI scores
     ### CHANGE task to 'CACI' to compute CACI scores
     ### SET normal_path: 'PATH_TO_NORMAL_TRAIN_IMAGES'
+<<<<<<< HEAD
    module_name: projects.24_normative_eval.DownstreamEvaluator
    class_name: PDownstreamEvaluator
    checkpoint_path: *checkpoint_path
@@ -159,6 +188,26 @@ downstream_tasks:
            test:
              - './data/fastMRI/splits/absent_septum_neg.csv'
 #        artefacts:
+=======
+#    module_name: projects.24_normative_eval.DownstreamEvaluator
+#    class_name: PDownstreamEvaluator
+#    checkpoint_path: *checkpoint_path
+#    params: 
+#      task: 'detection'
+#      normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
+#    data_loader:
+#      module_name: core.DataLoader
+#      class_name: DefaultDataLoader
+#      params:
+#        args:
+#          target_size: *target_size
+#          batch_size: *dbatch_size
+#          dataset_module:
+#            module_name: data.loaders.fastmri_loader
+#            class_name: BrainLoader
+#      datasets:
+#        absent_septum:
+>>>>>>> a2e0d1a01e45c7ec710f093697958bf0ecb8d67b
 #          data_dir:
 #            test:
 #              - './data/fastMRI/splits/artefacts.csv'

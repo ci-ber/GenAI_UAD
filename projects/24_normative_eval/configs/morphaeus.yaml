@@ -98,8 +98,9 @@ downstream_tasks:
     module_name: projects.24_normative_eval.DownstreamEvaluator
     class_name: PDownstreamEvaluator
     checkpoint_path: *checkpoint_path
-    task: 'RQI'
-    normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
+    params:
+      task: 'RQI'
+      normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
     data_loader:
       module_name: core.DataLoader
       class_name: DefaultDataLoader
@@ -152,8 +153,9 @@ downstream_tasks:
 #    module_name: projects.24_normative_eval.DownstreamEvaluator
 #    class_name: PDownstreamEvaluator
 #    checkpoint_path: *checkpoint_path
-#    task: 'detection'
-#    normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
+#    params: 
+#      task: 'detection'
+#      normal_path: './weights/24_normative_eval/Normal_brain_train/*.jpeg'
 #    data_loader:
 #      module_name: core.DataLoader
 #      class_name: DefaultDataLoader
