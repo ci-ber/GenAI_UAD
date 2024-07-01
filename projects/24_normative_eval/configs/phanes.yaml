@@ -7,7 +7,7 @@ checkpoint_path: &checkpoint_path ./weights/24_normative_eval/phanes/
 #
 experiment:
   name: 24_Normative_Eval
-  task: train
+  task: test
   weights: #'./weights/24_normative_eval/phanes/2023_09_08_21_53_25_742288/best_model.pt'
 #
 device: gpu

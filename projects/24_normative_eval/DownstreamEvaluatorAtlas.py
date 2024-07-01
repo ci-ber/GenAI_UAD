@@ -19,6 +19,8 @@ from dl_utils import *
 from optim.metrics import *
 from core.DownstreamEvaluator import DownstreamEvaluator
 from model_zoo.vgg import VGGEncoder
+import uuid
+import cv2
 
 
 class PDownstreamEvaluator(DownstreamEvaluator):
@@ -29,6 +31,10 @@ class PDownstreamEvaluator(DownstreamEvaluator):
 
     def __init__(self, name, model, device, test_data_dict, checkpoint_path, global_=True):
         super(PDownstreamEvaluator, self).__init__(name, model, device, test_data_dict, checkpoint_path)
+
+        print(f'Checkpoint path: {checkpoint_path}')
+        self.checkpoint_path = checkpoint_path + '/images/'
+        print(f'Checkpoint path: {checkpoint_path}')
 
         self.criterion_rec = L1Loss().to(self.device)
         self.vgg_encoder = VGGEncoder().to(self.device)
@@ -43,9 +49,12 @@ class PDownstreamEvaluator(DownstreamEvaluator):
         :param global_model: dict
                    the model weights
         """
-        self.pathology_localization(global_model, 1, 71, True)
-        self.pathology_localization(global_model, 71, 570, True)
-        self.pathology_localization(global_model, 570, 10000, True)
+        self.print_files(global_model)
+        print('Done')
+
+        # self.pathology_localization(global_model, 1, 71, True)
+        # self.pathology_localization(global_model, 71, 570, True)
+        # self.pathology_localization(global_model, 570, 10000, True)
 
     def _log_visualization(self, to_visualize, i, count):
         """
@@ -72,7 +81,6 @@ class PDownstreamEvaluator(DownstreamEvaluator):
         diffp.set_size_inches(len(to_visualize) * 4, 4)
 
         wandb.log({f'Anomaly_masks/Example_Atlas_{count}': [wandb.Image(diffp, caption="Atlas_" + str(count))]})
-
 
     def find_mask_size_thresholds(self, dataset):
         """
@@ -116,6 +124,66 @@ class PDownstreamEvaluator(DownstreamEvaluator):
         wandb.log({"Anomaly/Mask sizes1": [wandb.Image(Image.open(buf), caption="Mask Sizes")]})
 
         plt.clf()
+
+    def print_files(self, global_model):
+        """
+        Validation of downstream tasks
+        Prints images to disk
+
+        :param global_model:
+            Global parameters
+        """
+
+        self.model.load_state_dict(global_model, strict=False)
+        self.model.eval()
+
+
+        for dataset_key in self.test_data_dict.keys():
+
+            dataset = self.test_data_dict[dataset_key]
+
+            logging.info('DATASET: {}'.format(dataset_key))
+
+            for idx, data in enumerate(dataset):
+
+                # Call this to get the mask size thresholds for the dataset
+                # self.find_mask_size_thresholds(dataset)
+
+                # New per batch
+                if 'dict' in str(type(data)) and 'images' in data.keys():
+                    data0 = data['images']
+                else:
+                    data0 = data[0]
+                x = data0.to(self.device)
+                masks = data[1].to(self.device)
+                masks[masks > 0] = 1
+
+                anomaly_map, anomaly_score, x_rec_dict = self.model.get_anomaly(copy.deepcopy(x))
+                x_rec = x_rec_dict['x_rec'] if 'x_rec' in x_rec_dict.keys() else torch.zeros_like(x)
+                x_rec = torch.clamp(x_rec, 0, 1)
+
+                #
+
+                for i in range(len(x)):
+                        count = str(idx * len(x) + i)
+                        # Don't use images with large black artifacts:
+                        if int(count) in [100, 105, 112, 121, 186, 189, 210, 214, 345, 382, 424, 425, 435, 434, 441,
+                                          462, 464, 472, 478, 504]:
+                            print("skipping ", count)
+                            continue
+                        if torch.sum(masks[i][0]) < 3:
+                            continue
+
+                        # Example visualizations
+                        
+                        x_i = x[i][0]
+                        rec_2_i = x_rec[i][0]
+
+                        res_2_i_np = anomaly_map[i][0]
+
+                        cv2.imwrite(self.checkpoint_path + '/AnoDDPM_' + dataset_key + '_' + str(count) + '_rec.png',
+                                (rec_2_i.cpu().detach().numpy() * 255).astype(np.uint8))
+                       
 
     def pathology_localization(self, global_model, threshold_low, threshold_high, perc_flag=False):
         """

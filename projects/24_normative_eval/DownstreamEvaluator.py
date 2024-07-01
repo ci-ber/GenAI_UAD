@@ -46,6 +46,7 @@ class PDownstreamEvaluator(DownstreamEvaluator):
         self.global_ = False
         self.task = task
         self.training_normal_images_path = normal_path
+        self.checkpoint_path = checkpoint_path + '/images/'
 
     def start_task(self, global_model):
         """
@@ -56,7 +57,7 @@ class PDownstreamEvaluator(DownstreamEvaluator):
                    the model weights
         """
         # DIFFERENT THRESHOLDS THAT CAN BE DERIVED USING THE THRESHOLDING FUNCTION ON HEALTHY IMAGES
-        th = 0.007 # RA
+        # th = 0.007 # RA
         # th = 0.081 # DAE
         # th = 0.241 # AnoDDPM Gaussian
         # th = 0.006 # AnoDDPM Gaussian PL
@@ -69,24 +70,25 @@ class PDownstreamEvaluator(DownstreamEvaluator):
         # th = 0.113 # AE-S
         # th = 0.307 # SI-VAE
         # th = 0.171 # MorphAEus
-        # th = 0.001 # AutoDDPM
+        th = 0.001 # AutoDDPM
         # th = 0.27 # MAE
         # th = 0.083  # Patched_anoDDPM
         # th = 0.296 # f-AnoGAN
         # th = 0.281
         # th = 0.234 # AnoDDPM Gaussian +
-        if self.task == 'thresholding':
-            _ = self.thresholding(global_model)
-        elif self.task == 'RQI':
-            self.normative_eval_i_RQI(global_model)
-        elif self.task == 'AHI_UNN':
-            self.normative_eval_ii_AHI_UN_N(global_model)
-        elif self.task == 'AHI':
-            self.normative_eval_ii_AHI(global_model)
-        elif self.task == 'CACI':
-            self.normative_eval_iii_CACI(global_model)
-        elif self.task == 'detection':
-            self.object_localization(global_model, th)
+        # self.print_files(global_model)
+        # if self.task == 'thresholding':
+        #     _ = self.thresholding(global_model)
+        # elif self.task == 'RQI':
+        #     self.normative_eval_i_RQI(global_model)
+        # elif self.task == 'AHI_UNN':
+        #     self.normative_eval_ii_AHI_UN_N(global_model)
+        # elif self.task == 'AHI':
+        #     self.normative_eval_ii_AHI(global_model)
+        # elif self.task == 'CACI':
+        #     self.normative_eval_iii_CACI(global_model)
+        # elif self.task == 'detection':
+        self.object_localization(global_model, th)
 
     def _log_visualization(self, to_visualize, dataset_key, count):
         """
@@ -112,7 +114,7 @@ class PDownstreamEvaluator(DownstreamEvaluator):
             axarr[idx].imshow(tensor, cmap=dict.get('cmap', 'gray'), vmin=dict.get('vmin', 0), vmax=dict.get('vmax', 1))
         diffp.set_size_inches(len(to_visualize) * 4, 4)
 
-        wandb.log({f'Anomaly_masks/Example_FastMRI_{dataset_key}_{count}': [wandb.Image(diffp, caption="Atlas_" + str(
+        wandb.log({f'Anomaly_masks/Example_FastMRI_{dataset_key}_{count}': [wandb.Image(diffp, caption="Fast_" + str(
             count))]})
 
     def normative_eval_i_RQI(self, global_model):
@@ -529,6 +531,58 @@ class PDownstreamEvaluator(DownstreamEvaluator):
         logging.info(f'Th_1: [{th_1}]: {fpr_1} || Th_2: [{th_2}]: {fpr_2} || Th_5: [{best_th}]: {best_fpr}')
         return best_th
 
+    def print_files(self, global_model):
+        """
+        Validation of downstream tasks
+        Prints images to disk
+
+        :param global_model:
+            Global parameters
+        """
+
+        self.model.load_state_dict(global_model, strict=False)
+        self.model.eval()
+
+
+        for dataset_key in self.test_data_dict.keys():
+
+            dataset = self.test_data_dict[dataset_key]
+
+            logging.info('DATASET: {}'.format(dataset_key))
+
+            for idx, data in enumerate(dataset):
+
+                # Call this to get the mask size thresholds for the dataset
+                # self.find_mask_size_thresholds(dataset)
+
+                # New per batch
+                if 'dict' in str(type(data)) and 'images' in data.keys():
+                    data0 = data['images']
+                else:
+                    data0 = data[0]
+                x = data0.to(self.device)
+                masks = data[1].to(self.device)
+                masks[masks > 0] = 1
+
+                anomaly_map, anomaly_score, x_rec_dict = self.model.get_anomaly(copy.deepcopy(x))
+                x_rec = x_rec_dict['x_rec'] if 'x_rec' in x_rec_dict.keys() else torch.zeros_like(x)
+                x_rec = torch.clamp(x_rec, 0, 1)
+
+                #
+
+                for i in range(len(x)):
+                        count = str(idx * len(x) + i)
+                        # Don't use images with large black artifacts:
+                        # Example visualizations
+                        
+                        x_i = x[i][0]
+                        rec_2_i = x_rec[i][0]
+
+                        res_2_i_np = anomaly_map[i][0]
+
+                        cv2.imwrite(self.checkpoint_path + '/AnoDDPM_' + dataset_key + '_' + str(count) + '_rec.png',
+                                (rec_2_i.cpu().detach().numpy() * 255).astype(np.uint8))
+                        
     def object_localization(self, global_model, th=0):
         """
         Validation of downstream tasks
@@ -615,14 +669,14 @@ class PDownstreamEvaluator(DownstreamEvaluator):
                     x_ = x_i.cpu().detach().numpy()
                     x_rec_ = x_rec_i.cpu().detach().numpy()
 
-                    cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_mask.png',
-                                (mask_ * 255).astype(np.uint8))
-                    cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_neg_mask.png',
-                                (neg_mask_ * 255).astype(np.uint8))
-                    cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_rec.png',
-                                (x_rec_ * 255).astype(np.uint8))
-                    cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_orig.png',
-                                (x_ * 255).astype(np.uint8))
+                    # cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_mask.png',
+                    #             (mask_ * 255).astype(np.uint8))
+                    # cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_neg_mask.png',
+                    #             (neg_mask_ * 255).astype(np.uint8))
+                    # cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_rec.png',
+                    #             (x_rec_ * 255).astype(np.uint8))
+                    # cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_orig.png',
+                    #             (x_ * 255).astype(np.uint8))
                     # print(anomaly_map_i.shape)
 
 
@@ -641,15 +695,15 @@ class PDownstreamEvaluator(DownstreamEvaluator):
                     # cv2.imwrite(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_anomaly.png',
                     #             (np.squeeze(x_combo) * 255 * 20).astype(np.uint8))
 
-                    fig = plt.figure(frameon=False)
-                    fig.set_size_inches(4, 4)
+                    # fig = plt.figure(frameon=False)
+                    # fig.set_size_inches(4, 4)
+# 
+                    # ax = plt.Axes(fig, [0., 0., 1., 1.])
+                    # ax.set_axis_off()
+                    # fig.add_axes(ax)
 
-                    ax = plt.Axes(fig, [0., 0., 1., 1.])
-                    ax.set_axis_off()
-                    fig.add_axes(ax)
-
-                    ax.imshow(np.squeeze(x_combo), cmap='plasma', vmin=0, vmax=x_combo.max())
-                    fig.savefig(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_anomaly.png', dpi=300)
+                    # ax.imshow(np.squeeze(x_combo), cmap='plasma', vmin=0, vmax=x_combo.max())
+                    # fig.savefig(self.checkpoint_path + '/' + dataset_key + '_' + str(count) + '_anomaly.png', dpi=300)
 
                     x_pos = x_combo * mask_
                     x_neg = x_combo * neg_mask_
@@ -681,9 +735,9 @@ class PDownstreamEvaluator(DownstreamEvaluator):
                             {'title': 'x', 'tensor': x_},
                             {'title': 'x_rec', 'tensor': x_rec_},
                             {'title': f'Anomaly  map {anomaly_map_i.max():.3f}', 'tensor': anomaly_map_i,
-                             'cmap': 'inferno', 'vmax': anomaly_map_i.max()},
+                             'cmap': 'plasma', 'vmax': anomaly_map_i.max()},
                             {'title': f'Combo map {x_combo.max():.3f}', 'tensor': x_combo,
-                             'cmap': 'inferno', 'vmax': x_combo.max()}
+                             'cmap': 'plasma', 'vmax': x_combo.max()}
                         ]
 
                         if 'mask' in x_rec_dict.keys():
